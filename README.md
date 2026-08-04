@@ -12,6 +12,7 @@ FluxEnv 是一个基于 Bash 的环境初始化工具，面向 WSL、Ubuntu / De
 - `scripts/fetch_resources.sh`：离线资源抓取入口
 - `scripts/add_claude_user.sh`：让多个 Linux 用户共用同一个 Claude Code 登录（详见 `docs/CLAUDE_SHARED_LOGIN.md`）
 - `scripts/add_ssh_key.sh`：给用户加 SSH 公钥登录并打印客户端 ssh config（配合上面的共享用户，详见同文档）
+- `scripts/add_user.sh`：用仓库模板（`zshrc.txt` + bare-metal Starship 配置 + 离线插件/二进制）交互式创建新用户（zsh + Starship + sudo/docker 组 + SSH 目录）
 - `scripts/ssh_disable_password.sh`：关闭 SSH 密码登录只留公钥（公网加固，带防锁死检查）
 - `scripts/setup_reality.sh`：在 VPS 上一键部署 VLESS+Vision+REALITY 代理并产出 v2rayN 链接（详见 `docs/REALITY_PROXY.md`）
 - `scripts/deploy-cisco.sh`：一键部署 ISRC Cisco AnyConnect VPN（openconnect + systemd 服务 + `ciscoup` 命令，详见下方「ISRC Cisco VPN」）
@@ -152,6 +153,18 @@ git clone https://github.com/zsh-users/zsh-autosuggestions ~/.zsh/plugins/zsh-au
 # 安装 zsh-syntax-highlighting
 git clone https://github.com/zsh-users/zsh-syntax-highlighting.git ~/.zsh/plugins/zsh-syntax-highlighting
 ```
+
+## 创建新用户
+
+`scripts/add_user.sh` 泛化自「把 winbeau 配置复制给新用户」的手工脚本，配置源全部改为仓库资产（不依赖个人家目录）：`zshrc.txt`、内嵌的 bare-metal Starship 模板（与 `lib/steps/user_shell.sh` 生成内容一致）、`offline_resources/` 里的 Starship 离线包与 zsh 插件。
+
+```bash
+cd /path/to/FluxEnv
+bash scripts/add_user.sh                # 交互输入用户名和密码
+bash scripts/add_user.sh alice          # 用户名用参数，密码交互输入
+```
+
+行为：安装 sudo/zsh/curl（缺失时）、按架构装 Starship、建 docker 组并把用户加入 sudo,docker、复制 zshrc/starship.toml/插件、建 `.ssh/authorized_keys` 占位；旧配置先备份；密码输入两次，留空则跳过（账户保持锁定）。用户已存在时幂等更新。
 
 ## Claude 多用户共享登录
 
