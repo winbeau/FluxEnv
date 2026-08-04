@@ -14,6 +14,7 @@ FluxEnv 是一个基于 Bash 的环境初始化工具，面向 WSL、Ubuntu / De
 - `scripts/add_ssh_key.sh`：给用户加 SSH 公钥登录并打印客户端 ssh config（配合上面的共享用户，详见同文档）
 - `scripts/ssh_disable_password.sh`：关闭 SSH 密码登录只留公钥（公网加固，带防锁死检查）
 - `scripts/setup_reality.sh`：在 VPS 上一键部署 VLESS+Vision+REALITY 代理并产出 v2rayN 链接（详见 `docs/REALITY_PROXY.md`）
+- `scripts/deploy-cisco.sh`：一键部署 ISRC Cisco AnyConnect VPN（openconnect + systemd 服务 + `ciscoup` 命令，详见下方「ISRC Cisco VPN」）
 
 ## 仓库结构
 
@@ -183,6 +184,23 @@ sudo bash scripts/ssh_disable_password.sh undo
 原理、实测依据与代价（进程 uid、历史共享、额度、git/ssh 身份等）见 `docs/CLAUDE_SHARED_LOGIN.md`。
 
 > ⚠️ 仅用于**同一个人**的多个账号复用一份订阅；给不同的人共享个人订阅违反 Anthropic 条款。
+
+## ISRC Cisco VPN
+
+`scripts/deploy-cisco.sh` 把 `ciscoup` 命令背后的整套部署资产一键装好：`openconnect`（缺失时 apt 自动安装）、`/usr/local/sbin/cisco-vpn-run`、`cisco-vpn.service` 服务单元、`~/bin/ciscoup` 命令；自动创建所需目录、备份已存在文件，重复执行幂等。
+
+```bash
+cd /path/to/FluxEnv
+bash scripts/deploy-cisco.sh          # 非 root 时自动用 sudo 重执行
+```
+
+部署完成后连接 VPN（提示输入 PIN 码 + 当前动态码）：
+
+```bash
+ciscoup
+```
+
+可选环境变量：`CISCO_USER`、`CISCO_AUTHGROUP`、`CISCO_SERVER`、`CISCO_INTERFACE`、`CISCO_ROUTE_CHECK`、`CISCO_ENABLE=1`（开机自启，默认按需启动）。卸载：`bash scripts/deploy-cisco.sh remove`。
 
 ## 代理说明
 
