@@ -22,7 +22,9 @@ for source_file in \
     packages/netui/bin/netctl packages/netui/lib/common.sh packages/netui/lib/paths.sh \
     packages/netui/lib/config_store.sh packages/netui/lib/config_meta.sh packages/netui/lib/share_uri.sh \
     packages/netui/lib/env_profiles.sh packages/netui/lib/runtime_tmux.sh \
-    packages/netui/lib/shell_integration.sh packages/netui/lib/tui.sh packages/netui/share/shell/init.sh; do
+    packages/netui/lib/shell_integration.sh packages/netui/lib/tui.sh \
+    packages/netui/lib/tui_terminal.sh packages/netui/lib/tui_render.sh \
+    packages/netui/share/shell/init.sh; do
     target="$release/${source_file#packages/netui/}"
     mkdir -p "${target%/*}"
     cp -- "$repo_root/$source_file" "$target"

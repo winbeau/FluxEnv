@@ -6,12 +6,17 @@ umask 077
 version='__NETUI_RELEASE_VERSION__'
 release_base_url='__NETUI_RELEASE_BASE_URL__'
 
+stage() {
+    printf 'netui bootstrap: [%s/7] %s\n' "$1" "$2"
+}
+
 fail() {
-    printf 'netui bootstrap: %s\n' "$1" >&2
+    printf 'netui bootstrap: failed: %s\n' "$1" >&2
     exit 1
 }
 
-case "$(uname -s)" in
+stage 1 "Detecting Linux architecture"
+case "$(uname -s 2>/dev/null || true)" in
     Linux)
         ;;
     *)
@@ -19,7 +24,7 @@ case "$(uname -s)" in
         ;;
 esac
 
-case "$(uname -m)" in
+case "$(uname -m 2>/dev/null || true)" in
     x86_64|amd64)
         arch=amd64
         ;;
@@ -27,17 +32,23 @@ case "$(uname -m)" in
         arch=arm64
         ;;
     *)
-        fail "unsupported architecture: $(uname -m)"
+        fail "unsupported architecture: $(uname -m 2>/dev/null || true)"
         ;;
 esac
+printf 'netui bootstrap: architecture %s\n' "$arch"
 
+stage 2 'Checking bootstrap dependencies'
+missing=''
 for command_name in bash curl tar sha256sum mktemp awk grep; do
-    command -v "$command_name" >/dev/null 2>&1 || fail "missing dependency: $command_name"
+    if ! command -v "$command_name" >/dev/null 2>&1; then
+        missing="$missing $command_name"
+    fi
 done
-
+[ -z "$missing" ] || fail "missing bootstrap dependencies:${missing}"
 if ! bash -c 'test "${BASH_VERSINFO[0]}" -ge 4' >/dev/null 2>&1; then
     fail 'Bash 4 or newer is required'
 fi
+printf '%s\n' 'netui bootstrap: bootstrap dependencies ok'
 
 case "$release_base_url" in
     https://*)
@@ -63,11 +74,19 @@ cleanup() {
 }
 trap cleanup EXIT HUP INT TERM
 
-curl --fail --location --silent --show-error --retry 3 --proto '=https' --tlsv1.2 \
+stage 3 "Downloading $archive_name"
+curl --fail --location --show-error --retry 3 --proto '=https' --tlsv1.2 \
     --output "$temporary_dir/$archive_name" "$release_base_url/$archive_name" || fail 'release archive download failed'
-curl --fail --location --silent --show-error --retry 3 --proto '=https' --tlsv1.2 \
-    --output "$temporary_dir/$checksums_name" "$release_base_url/$checksums_name" || fail 'checksum download failed'
+[ -s "$temporary_dir/$archive_name" ] || fail 'release archive is empty'
+printf '%s\n' 'netui bootstrap: release archive download complete'
 
+stage 4 "Downloading $checksums_name"
+curl --fail --location --show-error --retry 3 --proto '=https' --tlsv1.2 \
+    --output "$temporary_dir/$checksums_name" "$release_base_url/$checksums_name" || fail 'checksum download failed'
+[ -s "$temporary_dir/$checksums_name" ] || fail 'checksum file is empty'
+printf '%s\n' 'netui bootstrap: checksum download complete'
+
+stage 5 'Verifying SHA256 and archive safety'
 checksum_line=$(grep -E "^[0-9a-f]{64}[[:space:]][[:space:]]${archive_name}$" "$temporary_dir/$checksums_name" || true)
 checksum_count=$(printf '%s\n' "$checksum_line" | awk 'NF {count++} END {print count + 0}')
 [ "$checksum_count" = 1 ] || fail 'checksum file does not contain exactly one expected archive entry'
@@ -94,12 +113,17 @@ while IFS= read -r member_line || [ -n "$member_line" ]; do
             ;;
     esac
 done < "$temporary_dir/archive.verbose"
+printf '%s\n' 'netui bootstrap: checksum and archive safety ok'
 
+stage 6 'Unpacking release'
 mkdir -p -- "$temporary_dir/unpack"
 tar -xzf "$temporary_dir/$archive_name" -C "$temporary_dir/unpack" \
     --no-same-owner --no-same-permissions --no-overwrite-dir || fail 'cannot unpack release archive'
 package_dir="$temporary_dir/unpack/netui-v${version}-linux-${arch}"
 [ -d "$package_dir" ] || fail 'release archive has an unexpected top-level directory'
 [ -f "$package_dir/install.sh" ] && [ ! -L "$package_dir/install.sh" ] || fail 'release installer is missing or unsafe'
+printf '%s\n' 'netui bootstrap: release unpacked'
 
+stage 7 'Installing NetUI into user directories'
 bash "$package_dir/install.sh" --from-release
+printf 'netui bootstrap: completed NetUI v%s\n' "$version"

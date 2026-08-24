@@ -44,14 +44,23 @@ install_core_require_command() {
 
 install_core_require_base_dependencies() {
     local command_name=''
+    local missing=''
 
     if ((BASH_VERSINFO[0] < 4)); then
         install_core_error 'Bash 4 or newer is required'
         return 3
     fi
     for command_name in jq tmux flock sha256sum realpath tar gzip install mktemp; do
-        install_core_require_command "$command_name" || return $?
+        if ! command -v "$command_name" >/dev/null 2>&1; then
+            missing="$missing $command_name"
+        fi
     done
+    if [[ -n "$missing" ]]; then
+        install_core_error "missing runtime dependencies:${missing}"
+        install_core_error 'Ubuntu/Debian suggestion:'
+        install_core_error '  sudo apt-get update && sudo apt-get install -y jq tmux curl'
+        return 3
+    fi
 }
 
 install_core_require_clone_dependencies() {
@@ -296,6 +305,8 @@ install_core_validate_source_tree() {
         lib/runtime_tmux.sh
         lib/shell_integration.sh
         lib/tui.sh
+        lib/tui_terminal.sh
+        lib/tui_render.sh
         share/shell/init.sh
         examples/config.example.json
         THIRD_PARTY_NOTICES.md
@@ -351,6 +362,8 @@ install_core_validate_release_tree() {
         lib/runtime_tmux.sh
         lib/shell_integration.sh
         lib/tui.sh
+        lib/tui_terminal.sh
+        lib/tui_render.sh
         share/shell/init.sh
         examples/config.example.json
         THIRD_PARTY_NOTICES.md
@@ -553,6 +566,11 @@ install_core_install_release_locked() {
     local release_root=$1
     local version=$2
     local package_root=$3
+
+    install_core_info 'checking runtime dependencies'
+    install_core_require_base_dependencies || return $?
+    install_core_info 'validating release tree and bundled binaries'
+    install_core_validate_release_tree "$release_root" "$version" || return 1
     local final_release=''
     local temporary_release=''
     local current_tmp=''
@@ -579,6 +597,8 @@ install_core_install_release_locked() {
         lib/runtime_tmux.sh
         lib/shell_integration.sh
         lib/tui.sh
+        lib/tui_terminal.sh
+        lib/tui_render.sh
         share/shell/init.sh
         examples/config.example.json
         licenses/NETUI-LICENSE
@@ -592,6 +612,7 @@ install_core_install_release_locked() {
     current_tmp="$NETUI_INSTALL_ROOT/.current.tmp.$$.$RANDOM"
     install_core_secure_dir "$NETUI_INSTALL_ROOT" || return 1
     install_core_secure_dir "$NETUI_INSTALL_RELEASES" || return 1
+    install_core_info "preparing $final_release"
     install_core_check_command_links "$final_release" || return 1
 
     if [[ -e "$NETUI_INSTALL_CURRENT" || -L "$NETUI_INSTALL_CURRENT" ]]; then
@@ -661,14 +682,17 @@ install_core_install_release_locked() {
         install_core_error 'bundled gum version does not match the release manifest'
         return 1
     }
+    install_core_info 'validating existing default configuration'
     install_core_check_existing_config "$path/bin/sing-box" || return 1
 
+    install_core_info 'switching current symlink'
     ln -s -- "releases/$version" "$current_tmp" || return 1
     mv -Tf -- "$current_tmp" "$NETUI_INSTALL_CURRENT" || {
         rm -f -- "$current_tmp"
         return 1
     }
     install_core_update_command_links || return 1
+    install_core_info 'installing netup/netdown/netui command links'
 
     install_core_initialize_runtime "$path" || return 1
     if [[ -f "$HOME/.bashrc" && -t 0 && -t 1 ]]; then
@@ -686,6 +710,7 @@ install_core_install_release_locked() {
     install_core_info "commands: $NETUI_INSTALL_BIN_HOME/netup, netdown, netui"
     install_core_info 'environment mode: off on first install; existing preference preserved'
     install_core_info 'open a new shell before checking command resolution'
+    install_core_info 'completed'
 }
 
 install_core_install_from_release() {
@@ -737,7 +762,9 @@ install_core_build_release_tree() {
     for path in "$package_root/bin/netctl" "$package_root/lib/common.sh" "$package_root/lib/paths.sh" \
         "$package_root/lib/config_store.sh" "$package_root/lib/config_meta.sh" "$package_root/lib/share_uri.sh" \
         "$package_root/lib/env_profiles.sh" "$package_root/lib/runtime_tmux.sh" \
-        "$package_root/lib/shell_integration.sh" "$package_root/lib/tui.sh" "$package_root/share/shell/init.sh"; do
+        "$package_root/lib/shell_integration.sh" "$package_root/lib/tui.sh" \
+        "$package_root/lib/tui_terminal.sh" "$package_root/lib/tui_render.sh" \
+        "$package_root/share/shell/init.sh"; do
         file=${path#"$package_root/"}
         if [[ "$file" == bin/* || "$file" == share/shell/* ]]; then
             install -D -m 755 -- "$path" "$release_root/$file"

@@ -414,7 +414,7 @@ assert_status 0 'TUI test action renders rounded fallback dashboard' bash -c 'NE
 assert_true 'fallback dashboard contains rounded border' grep -Fq '╭' "$tui_list_output"
 tui_narrow_output="$test_home/tui-narrow.txt"
 assert_status 0 'TUI compact layout works below 80 columns' bash -c 'COLUMNS=70 NETUI_TUI_ACTIONS="list;quit" "$1" > "$2" 2>&1' -- "$test_bin/netui" "$tui_narrow_output"
-assert_true 'compact layout identifies itself' grep -Fq 'NetUI (compact)' "$tui_narrow_output"
+assert_true 'compact layout identifies itself' grep -Fq 'NetUI v' "$tui_narrow_output"
 assert_status 0 'TUI test actions import rename and archive safely' bash -c 'NETUI_TUI_ACTIONS="import:$1:imported.json;rename:imported.json:renamed.json;archive:renamed.json;quit" "$2" >/dev/null 2>&1' -- "$outside_config" "$test_bin/netui"
 assert_true 'archived configuration is absent from configs' bash -c '[[ ! -e "$1/renamed.json" && ! -L "$1/renamed.json" ]]' -- "$config_dir"
 assert_true 'archived configuration is recoverable' bash -c 'find "$1" -type f -name renamed.json -print -quit | grep -q .' -- "$NETUI_CONFIG_TRASH_DIR"

@@ -56,7 +56,7 @@ case "$scene" in
         COLUMNS=70 NETUI_TUI_ACTIONS='list;quit' "$package_root/bin/netctl" netui
         ;;
     fallback)
-        NETUI_GUM="$NETUI_VISUAL_HOME/no-gum" COLUMNS=112 NETUI_TUI_ACTIONS='list;quit' \
+        NETUI_GUM="$NETUI_VISUAL_HOME/no-gum" NETUI_TUI_FALLBACK=1 COLUMNS=112 NETUI_TUI_ACTIONS='list;quit' \
             "$package_root/bin/netctl" netui
         ;;
     *)

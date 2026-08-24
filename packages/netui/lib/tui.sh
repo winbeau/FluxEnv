@@ -196,6 +196,12 @@ tui_render_compact_dashboard() {
 }
 
 tui_render_dashboard() {
+    if declare -F tui_v2_render_dashboard >/dev/null 2>&1 &&
+        [[ "${NETUI_TUI_FALLBACK:-0}" != 1 ]]; then
+        tui_v2_render_dashboard
+        return $?
+    fi
+
     local default_basename=''
     local env_summary=''
     local env_mode=''
@@ -608,6 +614,11 @@ tui_run() {
     if [[ ! -t 0 || ! -t 1 ]]; then
         netui_print_error 'netui requires an interactive terminal'
         return 2
+    fi
+    if declare -F tui_v2_run >/dev/null 2>&1 &&
+        [[ "${TERM:-}" != dumb && "${NETUI_TUI_FALLBACK:-0}" != 1 ]]; then
+        tui_v2_run
+        return $?
     fi
     trap 'printf "\\n"; exit 130' INT TERM
     tui_run_loop

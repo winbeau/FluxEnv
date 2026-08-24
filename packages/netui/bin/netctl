@@ -25,6 +25,10 @@ source "$netctl_root/lib/runtime_tmux.sh"
 source "$netctl_root/lib/shell_integration.sh"
 # shellcheck source=../lib/tui.sh
 source "$netctl_root/lib/tui.sh"
+# shellcheck source=../lib/tui_terminal.sh
+source "$netctl_root/lib/tui_terminal.sh"
+# shellcheck source=../lib/tui_render.sh
+source "$netctl_root/lib/tui_render.sh"
 
 netctl_version() {
     local version=''

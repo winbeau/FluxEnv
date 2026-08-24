@@ -67,14 +67,14 @@ for scene in dashboard config-switch env-modes narrow fallback; do
     }
 
     baseline="$repo_root/tests/netui/visual/baseline/$scene.png"
+    if [[ "${UPDATE_VISUAL_BASELINE:-0}" == 1 ]]; then
+        mkdir -p -- "${baseline%/*}"
+        cp -f -- "$actual" "$baseline"
+        continue
+    fi
     if [[ ! -f "$baseline" ]]; then
-        if [[ "${UPDATE_VISUAL_BASELINE:-0}" == 1 ]]; then
-            mkdir -p -- "${baseline%/*}"
-            cp -f -- "$actual" "$baseline"
-        else
-            printf 'netui visual: missing baseline for %s; review PNG and rerun with UPDATE_VISUAL_BASELINE=1\n' "$scene" >&2
-            exit 1
-        fi
+        printf 'netui visual: missing baseline for %s; review PNG and rerun with UPDATE_VISUAL_BASELINE=1\n' "$scene" >&2
+        exit 1
     fi
 
     metric=$(compare -fuzz 5% -metric AE "$baseline" "$actual" "$diff" 2>&1 >/dev/null || true)
