@@ -231,7 +231,8 @@ prepare_output_dir() {
         "$output_dir/install-v$version.sh" \
         "$output_dir/SHA256SUMS" \
         "$output_dir/RELEASE-MANIFEST.json" \
-        "$output_dir/THIRD_PARTY_NOTICES.md"; do
+        "$output_dir/THIRD_PARTY_NOTICES.md" \
+        "$output_dir/SOURCE-CODE-OFFER.md"; do
         if [[ -L "$output_file" || ( -e "$output_file" && ! -f "$output_file" ) ]]; then
             install_core_error "refusing unsafe generated output path: $output_file"
             return 1
@@ -277,6 +278,7 @@ fi
 chmod 755 -- "$output_dir/$install_script_name"
 
 install -D -m 644 -- "$package_root/THIRD_PARTY_NOTICES.md" "$output_dir/THIRD_PARTY_NOTICES.md"
+install -D -m 644 -- "$package_root/SOURCE-CODE-OFFER.md" "$output_dir/SOURCE-CODE-OFFER.md"
 
 amd64_archive="netui-v$version-linux-amd64.tar.gz"
 arm64_archive="netui-v$version-linux-arm64.tar.gz"
@@ -284,6 +286,7 @@ amd64_sha=$(sha256sum -- "$output_dir/$amd64_archive" | awk '{print $1}')
 arm64_sha=$(sha256sum -- "$output_dir/$arm64_archive" | awk '{print $1}')
 installer_sha=$(sha256sum -- "$output_dir/$install_script_name" | awk '{print $1}')
 notices_sha=$(sha256sum -- "$output_dir/THIRD_PARTY_NOTICES.md" | awk '{print $1}')
+source_offer_sha=$(sha256sum -- "$output_dir/SOURCE-CODE-OFFER.md" | awk '{print $1}')
 
 jq -n \
     --arg project netui \
@@ -292,11 +295,13 @@ jq -n \
     --arg arm64_name "$arm64_archive" --arg arm64_sha "$arm64_sha" \
     --arg installer_name "$install_script_name" --arg installer_sha "$installer_sha" \
     --arg notices_name THIRD_PARTY_NOTICES.md --arg notices_sha "$notices_sha" \
+    --arg source_offer_name SOURCE-CODE-OFFER.md --arg source_offer_sha "$source_offer_sha" \
     '{schema:1,project:$project,version:$version,assets:[
         {name:$amd64_name,sha256:$amd64_sha,arch:"amd64"},
         {name:$arm64_name,sha256:$arm64_sha,arch:"arm64"},
         {name:$installer_name,sha256:$installer_sha,kind:"bootstrap"},
-        {name:$notices_name,sha256:$notices_sha,kind:"notices"}
+        {name:$notices_name,sha256:$notices_sha,kind:"notices"},
+        {name:$source_offer_name,sha256:$source_offer_sha,kind:"source-offer"}
     ]}' > "$output_dir/RELEASE-MANIFEST.json"
 chmod 644 -- "$output_dir/RELEASE-MANIFEST.json"
 
@@ -307,12 +312,13 @@ $arm64_sha  $arm64_archive
 $installer_sha  $install_script_name
 $manifest_sha  RELEASE-MANIFEST.json
 $notices_sha  THIRD_PARTY_NOTICES.md
+$source_offer_sha  SOURCE-CODE-OFFER.md
 EOF
 chmod 644 -- "$output_dir/SHA256SUMS"
 
 secret_scan "$output_dir"
 
-expected_assets=$(printf '%s\n' "$amd64_archive" "$arm64_archive" "$install_script_name" RELEASE-MANIFEST.json THIRD_PARTY_NOTICES.md)
+expected_assets=$(printf '%s\n' "$amd64_archive" "$arm64_archive" "$install_script_name" RELEASE-MANIFEST.json THIRD_PARTY_NOTICES.md SOURCE-CODE-OFFER.md)
 actual_assets=$(awk '{print $2}' "$output_dir/SHA256SUMS")
 [[ "$actual_assets" == "$expected_assets" ]] || {
     install_core_error 'SHA256SUMS asset names do not exactly match the expected release assets'
