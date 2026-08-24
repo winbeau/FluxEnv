@@ -48,10 +48,18 @@ ln -s /path/to/packages/netui/bin/netctl ~/.local/bin/netui
 
 当前包已包含安装和本地 Release 构建入口：
 
+固定版本安装：
+
+```bash
+curl -fsSL 'https://gitcode.com/winbeau/FluxEnv/releases/download/v0.1.0/install-v0.1.0.sh' | sh
+```
+
+本地构建：
+
 ```bash
 bash packages/netui/install.sh --asset-dir /path/to/locked-assets
 bash packages/netui/scripts/build-release.sh --asset-dir /path/to/locked-assets \
-    --release-base-url '<verified-https-release-directory>'
+    --release-base-url 'https://gitcode.com/winbeau/FluxEnv/releases/download/v0.1.0'
 ```
 
 `manifest.lock` 固定 sing-box 1.13.18、gum 2.0.0 的 Linux amd64/arm64 来源和 SHA256。安装器会校验资产、创建版本目录和 `current` 原子链接，并只在验证通过后建立 `netup`、`netdown`、`netui` 链接。`bootstrap.sh`/`install-v*.sh` 只接受固定 HTTPS Release 目录，不接受 `latest`。GPL 对应源码入口见 `SOURCE-CODE-OFFER.md`。
