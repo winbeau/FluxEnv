@@ -7,6 +7,107 @@ tui_terminal_saved_stty=''
 tui_terminal_alt_screen=0
 tui_terminal_key=''
 tui_terminal_hidden_value=''
+tui_terminal_char_cells=0
+tui_terminal_text_locale=''
+
+tui_terminal_init_text_locale() {
+    [[ -n "$tui_terminal_text_locale" ]] && return 0
+    if [[ "$(LC_ALL=C.UTF-8 locale charmap 2>/dev/null)" == UTF-8 ]]; then
+        tui_terminal_text_locale=C.UTF-8
+    else
+        tui_terminal_text_locale=${LC_ALL:-${LC_CTYPE:-${LANG:-C}}}
+    fi
+}
+
+tui_terminal_char_width() {
+    local char=${1:-}
+    local code=0
+
+    tui_terminal_init_text_locale
+    local LC_ALL=$tui_terminal_text_locale
+    tui_terminal_char_cells=0
+    [[ -n "$char" ]] || return 0
+    printf -v code '%d' "'$char" 2>/dev/null || {
+        tui_terminal_char_cells=1
+        return 0
+    }
+
+    if ((
+        code == 0 || code < 32 || (code >= 127 && code < 160) ||
+        (code >= 0x200B && code <= 0x200F) ||
+        (code >= 0x202A && code <= 0x202E) ||
+        (code >= 0x2060 && code <= 0x206F) ||
+        code == 0xFEFF
+    )); then
+        tui_terminal_char_cells=0
+    elif ((
+        (code >= 0x0300 && code <= 0x036F) ||
+        (code >= 0x0483 && code <= 0x0489) ||
+        (code >= 0x0591 && code <= 0x05BD) ||
+        code == 0x05BF ||
+        (code >= 0x05C1 && code <= 0x05C2) ||
+        (code >= 0x05C4 && code <= 0x05C5) ||
+        code == 0x05C7 ||
+        (code >= 0x0610 && code <= 0x061A) ||
+        (code >= 0x064B && code <= 0x065F) ||
+        code == 0x0670 ||
+        (code >= 0x06D6 && code <= 0x06ED) ||
+        (code >= 0x0711 && code <= 0x0711) ||
+        (code >= 0x0730 && code <= 0x074A) ||
+        (code >= 0x07A6 && code <= 0x07B0) ||
+        (code >= 0x07EB && code <= 0x07F3) ||
+        (code >= 0x0816 && code <= 0x082D) ||
+        (code >= 0x0859 && code <= 0x085B) ||
+        (code >= 0x08D3 && code <= 0x0903) ||
+        (code >= 0x093A && code <= 0x093C) ||
+        (code >= 0x0941 && code <= 0x0948) ||
+        code == 0x094D ||
+        (code >= 0x0951 && code <= 0x0957) ||
+        (code >= 0x0962 && code <= 0x0963) ||
+        (code >= 0x1AB0 && code <= 0x1AFF) ||
+        (code >= 0x1DC0 && code <= 0x1DFF) ||
+        (code >= 0x20D0 && code <= 0x20FF) ||
+        (code >= 0xFE00 && code <= 0xFE0F) ||
+        (code >= 0xFE20 && code <= 0xFE2F) ||
+        (code >= 0x1F3FB && code <= 0x1F3FF) ||
+        (code >= 0xE0100 && code <= 0xE01EF)
+    )); then
+        tui_terminal_char_cells=0
+    elif ((
+        (code >= 0x1100 && code <= 0x115F) ||
+        code == 0x2329 || code == 0x232A ||
+        (code >= 0x2E80 && code <= 0x303E) ||
+        (code >= 0x3040 && code <= 0xA4CF) ||
+        (code >= 0xAC00 && code <= 0xD7A3) ||
+        (code >= 0xF900 && code <= 0xFAFF) ||
+        (code >= 0xFE10 && code <= 0xFE19) ||
+        (code >= 0xFE30 && code <= 0xFE6F) ||
+        (code >= 0xFF00 && code <= 0xFF60) ||
+        (code >= 0xFFE0 && code <= 0xFFE6) ||
+        (code >= 0x1F300 && code <= 0x1FAFF) ||
+        (code >= 0x20000 && code <= 0x3FFFD)
+    )); then
+        tui_terminal_char_cells=2
+    else
+        tui_terminal_char_cells=1
+    fi
+}
+
+tui_terminal_cell_width() {
+    local value=${1:-}
+    local char=''
+    local index=0
+    local width=0
+
+    tui_terminal_init_text_locale
+    local LC_ALL=$tui_terminal_text_locale
+    for ((index = 0; index < ${#value}; index++)); do
+        char=${value:index:1}
+        tui_terminal_char_width "$char"
+        width=$((width + tui_terminal_char_cells))
+    done
+    printf '%s' "$width"
+}
 
 tui_terminal_get_size() {
     local rows=''
@@ -30,9 +131,9 @@ tui_terminal_get_size() {
 tui_terminal_restore() {
     if ((tui_terminal_active)); then
         if ((tui_terminal_alt_screen)); then
-            printf '\033[?2004l\033[?25h\033[?1049l' >&1
+            printf '\033[0m\033[?2004l\033[?25h\033[?1049l' >&1
         else
-            printf '\033[?2004l\033[?25h' >&1
+            printf '\033[0m\033[?2004l\033[?25h' >&1
         fi
         if [[ -n "$tui_terminal_saved_stty" ]]; then
             stty "$tui_terminal_saved_stty" 2>/dev/null || true
@@ -46,16 +147,17 @@ tui_terminal_restore() {
 tui_terminal_enter() {
     [[ -t 0 && -t 1 ]] || return 1
     tui_terminal_saved_stty=$(stty -g 2>/dev/null) || return 1
+    tui_terminal_active=1
     stty -icanon -echo min 0 time 0 2>/dev/null || {
+        tui_terminal_active=0
         tui_terminal_saved_stty=''
         return 1
     }
-    tui_terminal_active=1
     if [[ "${NETUI_TUI_DISABLE_ALT_SCREEN:-0}" != 1 ]]; then
-        printf '\033[?1049h\033[?25l\033[?2004h' >&1
+        printf '\033[?1049h\033[0m\033[2J\033[H\033[?25l\033[?2004h' >&1
         tui_terminal_alt_screen=1
     else
-        printf '\033[?25l\033[?2004h' >&1
+        printf '\033[0m\033[2J\033[H\033[?25l\033[?2004h' >&1
     fi
 }
 

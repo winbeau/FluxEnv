@@ -44,19 +44,26 @@ fi
 prepare_fixture
 case "$scene" in
     dashboard)
-        COLUMNS=112 NETUI_TUI_ACTIONS='list;quit' "$package_root/bin/netctl" netui
+        NETUI_TUI_FIXED_ROWS=24 NETUI_TUI_FIXED_COLS=108 NETUI_TUI_COLOR=always NETUI_TUI_DISABLE_ALT_SCREEN=1 \
+            "$package_root/bin/netctl" netui
         ;;
     config-switch)
-        COLUMNS=112 NETUI_TUI_ACTIONS='default:beta.json;list;quit' "$package_root/bin/netctl" netui
+        NETUI_TUI_ACTIONS='default:beta.json;quit' "$package_root/bin/netctl" netui >/dev/null
+        NETUI_TUI_FIXED_ROWS=24 NETUI_TUI_FIXED_COLS=108 NETUI_TUI_COLOR=always NETUI_TUI_DISABLE_ALT_SCREEN=1 \
+            "$package_root/bin/netctl" netui
         ;;
     env-modes)
-        COLUMNS=112 NETUI_TUI_ACTIONS='env:global;list;env:off;quit' "$package_root/bin/netctl" netui
+        NETUI_TUI_ACTIONS='env:global;quit' "$package_root/bin/netctl" netui >/dev/null
+        NETUI_TUI_FIXED_ROWS=24 NETUI_TUI_FIXED_COLS=108 NETUI_TUI_COLOR=always NETUI_TUI_DISABLE_ALT_SCREEN=1 \
+            "$package_root/bin/netctl" netui
         ;;
     narrow)
-        COLUMNS=70 NETUI_TUI_ACTIONS='list;quit' "$package_root/bin/netctl" netui
+        NETUI_TUI_ACTIONS='env:off;quit' "$package_root/bin/netctl" netui >/dev/null
+        NETUI_TUI_FIXED_ROWS=24 NETUI_TUI_FIXED_COLS=70 NETUI_TUI_COLOR=always NETUI_TUI_DISABLE_ALT_SCREEN=1 \
+            "$package_root/bin/netctl" netui
         ;;
     fallback)
-        NETUI_GUM="$NETUI_VISUAL_HOME/no-gum" NETUI_TUI_FALLBACK=1 COLUMNS=112 NETUI_TUI_ACTIONS='list;quit' \
+        NETUI_GUM="$NETUI_VISUAL_HOME/no-gum" NETUI_TUI_FALLBACK=1 COLUMNS=112 NETUI_TUI_ACTIONS='env:off;list;quit' \
             "$package_root/bin/netctl" netui
         ;;
     *)

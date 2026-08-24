@@ -1,6 +1,6 @@
 # NetUI（第二阶段）
 
-本目录是 FluxEnv 中 NetUI 的第二阶段实现：配置模型、tmux 单实例 CLI、持久代理环境 profile、Bash/Zsh shell 同步，以及 gum/ANSI fallback 配置管理 TUI。
+本目录是 FluxEnv 中 NetUI 的第二阶段实现：配置模型、tmux 单实例 CLI、持久代理环境 profile、Bash/Zsh shell 同步，以及低闪烁的全屏 ANSI 配置管理 TUI。
 
 ## 当前命令
 
@@ -14,9 +14,9 @@ ln -s /path/to/packages/netui/bin/netctl ~/.local/bin/netui
 
 - `netup` 只校验并启动 `default.json` 指向的配置，不接受临时配置参数。
 - `netdown` 只停止经过 NetUI token、tmux marker、pane PID、进程 starttime 和核心绝对路径交叉验证的实例；没有实例时幂等清理 stale state。
-- `netui` 在交互终端中提供配置管理 TUI；没有 gum 时自动使用纯 Bash/ANSI 圆角 fallback。
+- `netui` 在交互终端中提供全屏键盘 TUI；方向键移动选择，整行高亮当前配置，并在终端尺寸变化时重排。`TERM=dumb` 或 raw mode 不可用时退回行式界面。
 
-运行依赖：Bash、`jq`、`tmux`、`flock`、`sha256sum`、`realpath`、`tail`，以及 PATH 中、包内 `bin/sing-box` 或 `NETUI_SING_BOX` 指定的可执行核心。gum 优先使用包内 `bin/gum`，缺失时不阻断 TUI。
+运行依赖：Bash、`jq`、`tmux`、`flock`、`sha256sum`、`realpath`、`tail`，以及 PATH 中、包内 `bin/sing-box` 或 `NETUI_SING_BOX` 指定的可执行核心。gum 优先使用包内 `bin/gum`，缺失时不阻断 TUI。全屏界面默认在彩色 TTY 中启用分层主题；设置 `NO_COLOR=1` 或 `NETUI_TUI_COLOR=never` 可关闭颜色。
 
 ## 用户目录
 

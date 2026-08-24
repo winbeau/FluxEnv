@@ -87,6 +87,10 @@ source "$repo_root/packages/netui/lib/runtime_tmux.sh"
 source "$repo_root/packages/netui/lib/shell_integration.sh"
 # shellcheck source=../../packages/netui/lib/tui.sh
 source "$repo_root/packages/netui/lib/tui.sh"
+# shellcheck source=../../packages/netui/lib/tui_terminal.sh
+source "$repo_root/packages/netui/lib/tui_terminal.sh"
+# shellcheck source=../../packages/netui/lib/tui_render.sh
+source "$repo_root/packages/netui/lib/tui_render.sh"
 
 netui_init_dirs
 config_dir=$NETUI_CONFIG_DIR
@@ -119,6 +123,69 @@ assert_true() {
         printf 'FAIL: %s\n' "$label" >&2
         failures=$((failures + 1))
     fi
+}
+
+frame_geometry_matches() {
+    local path=$1
+    local expected_lines=$2
+    local expected_width=$3
+    local line=''
+    local line_count=0
+    local line_width=0
+
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        line_count=$((line_count + 1))
+        line_width=$(tui_terminal_cell_width "$line")
+        ((line_width == expected_width)) || return 1
+    done < "$path"
+    ((line_count == expected_lines))
+}
+
+tui_idle_redraw_stable() (
+    local read_count=0
+    local render_count=0
+
+    tui_v2_model_refresh() { :; }
+    tui_terminal_enter() { tui_terminal_active=1; }
+    tui_terminal_restore() { tui_terminal_active=0; }
+    tui_terminal_get_size() { printf '24|80'; }
+    tui_v2_render_frame() {
+        render_count=$((render_count + 1))
+        tui_v2_last_size='24|80'
+    }
+    tui_terminal_read_key() {
+        read_count=$((read_count + 1))
+        if ((read_count < 5)); then
+            return 1
+        fi
+        tui_terminal_key=QUIT
+        return 0
+    }
+    tui_v2_dispatch_key() {
+        tui_v2_running=0
+    }
+
+    tui_v2_run
+    ((render_count == 1))
+)
+
+capture_idle_tui() {
+    local output_path=$1
+    local command=''
+
+    printf -v command 'env HOME=%q XDG_CONFIG_HOME=%q XDG_DATA_HOME=%q XDG_STATE_HOME=%q NETUI_SING_BOX=%q NETUI_TMUX_SOCKET=%q NETUI_TUI_FIXED_ROWS=24 NETUI_TUI_FIXED_COLS=100 NETUI_TUI_COLOR=never TERM=xterm-256color %q' \
+        "$HOME" "$XDG_CONFIG_HOME" "$XDG_DATA_HOME" "$XDG_STATE_HOME" "$NETUI_SING_BOX" "$NETUI_TMUX_SOCKET" "$test_bin/netui"
+    { sleep 1; printf q; } | script -q -E never -c "$command" "$output_path" >/dev/null 2>&1
+}
+
+idle_tui_output_is_stable() {
+    local path=$1
+    local frame_count=0
+    local clear_count=0
+
+    frame_count=$(LC_ALL=C grep -aFo 'CONFIGURATIONS' "$path" 2>/dev/null | wc -l)
+    clear_count=$(LC_ALL=C grep -aFo $'\033[2J' "$path" 2>/dev/null | wc -l)
+    ((frame_count == 1 && clear_count == 1))
 }
 
 assert_file_mode() {
@@ -408,13 +475,32 @@ assert_true 'Zsh precmd preserves existing hook' bash -c '[[ "$1" == *existing_h
 assert_status 0 'remove shell integration precisely' shell_integration_remove
 assert_true 'bashrc integration block removed' bash -c '! grep -Fq "# >>> netui shell integration >>>" "$1"' -- "$HOME/.bashrc"
 
-# Deterministic TUI actions exercise fallback business paths without pretending to be a visual gate.
+# Deterministic TUI actions exercise business paths and renderer invariants.
 tui_list_output="$test_home/tui-list.txt"
-assert_status 0 'TUI test action renders rounded fallback dashboard' bash -c 'NETUI_TUI_ACTIONS="list;quit" "$1" > "$2" 2>&1' -- "$test_bin/netui" "$tui_list_output"
-assert_true 'fallback dashboard contains rounded border' grep -Fq '╭' "$tui_list_output"
+assert_status 0 'TUI test action renders the fullscreen dashboard' bash -c 'NETUI_TUI_FIXED_ROWS=24 NETUI_TUI_FIXED_COLS=112 NETUI_TUI_COLOR=never NETUI_TUI_ACTIONS="list;quit" "$1" > "$2" 2>&1' -- "$test_bin/netui" "$tui_list_output"
+assert_true 'fullscreen dashboard contains rounded border' grep -Fq '╭' "$tui_list_output"
+assert_true 'fullscreen frame keeps every right border in one column' frame_geometry_matches "$tui_list_output" 24 111
+assert_true 'idle event loop does not redraw unchanged frames' tui_idle_redraw_stable
+assert_true 'terminal width counts CJK cells' test "$(tui_terminal_cell_width '节点')" = 4
+assert_true 'terminal width remains UTF-8 safe under C locale' env LC_ALL=C bash -c 'source "$1"; [[ "$(tui_terminal_cell_width "节点")" == 4 ]]' -- "$repo_root/packages/netui/lib/tui_terminal.sh"
+assert_true 'terminal width counts combining marks' test "$(tui_terminal_cell_width $'e\u0301')" = 1
+assert_true 'emoji modifiers do not add terminal cells' test "$(tui_terminal_cell_width $'\U0001F3FB')" = 0
+tui_v2_fit_text '节点-alpha' 12
+assert_true 'renderer pads mixed-width names to exact cells' test "$(tui_terminal_cell_width "$tui_v2_fit_result")" = 12
+assert_true 'renderer strips C1 controls and degrades emoji safely' test "$(tui_v2_clean_text $'ok\u009b31m\U0001F642')" = 'ok31m?'
+tui_idle_output="$test_home/tui-idle.typescript"
+assert_status 0 'capture a real idle PTY session' capture_idle_tui "$tui_idle_output"
+assert_true 'idle PTY emits one frame and one initial clear' idle_tui_output_is_stable "$tui_idle_output"
+tui_color_output="$test_home/tui-color.txt"
+assert_status 0 'TUI emits the color theme when requested' bash -c 'NETUI_TUI_FIXED_ROWS=24 NETUI_TUI_FIXED_COLS=112 NETUI_TUI_COLOR=always NETUI_TUI_ACTIONS="list;quit" "$1" > "$2" 2>&1' -- "$test_bin/netui" "$tui_color_output"
+assert_true 'color theme includes layered backgrounds' grep -Fq $'\033[1;38;5;231;48;5;24m' "$tui_color_output"
+tui_no_color_output="$test_home/tui-no-color.txt"
+assert_status 0 'NO_COLOR disables the requested TUI theme' bash -c 'NO_COLOR=1 NETUI_TUI_FIXED_ROWS=24 NETUI_TUI_FIXED_COLS=112 NETUI_TUI_COLOR=always NETUI_TUI_ACTIONS="list;quit" "$1" > "$2" 2>&1' -- "$test_bin/netui" "$tui_no_color_output"
+assert_true 'NO_COLOR output contains no SGR sequences' bash -c '! grep -Fq "$1" "$2"' -- $'\033[' "$tui_no_color_output"
 tui_narrow_output="$test_home/tui-narrow.txt"
-assert_status 0 'TUI compact layout works below 80 columns' bash -c 'COLUMNS=70 NETUI_TUI_ACTIONS="list;quit" "$1" > "$2" 2>&1' -- "$test_bin/netui" "$tui_narrow_output"
+assert_status 0 'TUI compact layout works below 70 columns' bash -c 'NETUI_TUI_FIXED_ROWS=18 NETUI_TUI_FIXED_COLS=68 NETUI_TUI_COLOR=never NETUI_TUI_ACTIONS="list;quit" "$1" > "$2" 2>&1' -- "$test_bin/netui" "$tui_narrow_output"
 assert_true 'compact layout identifies itself' grep -Fq 'NetUI v' "$tui_narrow_output"
+assert_true 'compact frame also keeps a continuous right border' frame_geometry_matches "$tui_narrow_output" 18 67
 assert_status 0 'TUI test actions import rename and archive safely' bash -c 'NETUI_TUI_ACTIONS="import:$1:imported.json;rename:imported.json:renamed.json;archive:renamed.json;quit" "$2" >/dev/null 2>&1' -- "$outside_config" "$test_bin/netui"
 assert_true 'archived configuration is absent from configs' bash -c '[[ ! -e "$1/renamed.json" && ! -L "$1/renamed.json" ]]' -- "$config_dir"
 assert_true 'archived configuration is recoverable' bash -c 'find "$1" -type f -name renamed.json -print -quit | grep -q .' -- "$NETUI_CONFIG_TRASH_DIR"
