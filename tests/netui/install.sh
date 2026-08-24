@@ -19,7 +19,8 @@ for source_file in \
     packages/netui/install.sh packages/netui/lib/install_core.sh packages/netui/VERSION \
     packages/netui/README.md packages/netui/THIRD_PARTY_NOTICES.md packages/netui/SOURCE-CODE-OFFER.md packages/netui/examples/config.example.json \
     packages/netui/bin/netctl packages/netui/lib/common.sh packages/netui/lib/paths.sh \
-    packages/netui/lib/config_store.sh packages/netui/lib/env_profiles.sh packages/netui/lib/runtime_tmux.sh \
+    packages/netui/lib/config_store.sh packages/netui/lib/config_meta.sh packages/netui/lib/share_uri.sh \
+    packages/netui/lib/env_profiles.sh packages/netui/lib/runtime_tmux.sh \
     packages/netui/lib/shell_integration.sh packages/netui/lib/tui.sh packages/netui/share/shell/init.sh; do
     target="$release/${source_file#packages/netui/}"
     mkdir -p "${target%/*}"

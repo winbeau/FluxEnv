@@ -66,8 +66,9 @@ runtime_state_load() {
 }
 
 runtime_state_write() {
-    local temporary_state="$NETUI_RUNTIME_DIR/.instance.state.tmp.$$.$RANDOM"
+    local temporary_state=''
 
+    temporary_state=$(umask 077; mktemp "$NETUI_RUNTIME_DIR/.instance.state.tmp.XXXXXX") || return 1
     if ! (
         umask 077
         {
@@ -99,21 +100,25 @@ runtime_write_endpoint() {
     local endpoint=''
     local temporary_endpoint=''
 
-    endpoint=$(jq -r '
-        [.inbounds[]? |
-            select((.type? == "mixed" or .type? == "http" or .type? == "socks") and
-                (.listen? == "localhost" or .listen? == "127.0.0.1" or .listen? == "::1") and
-                (.listen_port? != null)) |
-            {type: .type, listen: .listen, port: .listen_port}]
-        | sort_by(if .type == "mixed" then 0 elif .type == "http" then 1 else 2 end)
-        | if length == 0 then empty else .[0] | "\(.type)|\(.listen)|\(.port)" end
-    ' "$runtime_config_path" 2>/dev/null) || endpoint=''
+    if declare -F config_meta_local_endpoint_tsv >/dev/null 2>&1; then
+        endpoint=$(config_meta_local_endpoint_tsv "$runtime_config_path" 2>/dev/null) || endpoint=''
+    else
+        endpoint=$(jq -r '
+            [.inbounds[]? |
+                select((.type? == "mixed" or .type? == "http" or .type? == "socks") and
+                    (.listen? == "localhost" or .listen? == "127.0.0.1" or .listen? == "::1") and
+                    (.listen_port? != null)) |
+                {type: .type, listen: .listen, port: .listen_port}]
+            | sort_by(if .type == "mixed" then 0 elif .type == "http" then 1 else 2 end)
+            | if length == 0 then empty else .[0] | "\(.type)|\(.listen)|\(.port)" end
+        ' "$runtime_config_path" 2>/dev/null) || endpoint=''
+    fi
     if [[ -z "$endpoint" ]]; then
         rm -f -- "$NETUI_PROXY_ENDPOINT"
         return 0
     fi
 
-    temporary_endpoint="$NETUI_RUNTIME_DIR/.proxy-endpoint.tmp.$$.$RANDOM"
+    temporary_endpoint=$(umask 077; mktemp "$NETUI_RUNTIME_DIR/.proxy-endpoint.tmp.XXXXXX") || return 1
     if ! (
         umask 077
         printf '%s\n' "$endpoint" > "$temporary_endpoint"
@@ -167,6 +172,24 @@ runtime_session_options_match() {
 runtime_kill_marked_session() {
     runtime_session_exists || return 0
     runtime_session_options_match || return 6
+    netui_tmux kill-session -t "$NETUI_TMUX_SESSION_NAME" >/dev/null 2>&1
+}
+
+runtime_kill_created_session() {
+    local expected_pane=$1
+    local expected_token=$2
+    local expected_core=$3
+    local current_pane=''
+    local option_token=''
+    local option_core=''
+
+    runtime_session_exists || return 0
+    current_pane=$(netui_tmux display-message -p -t "$NETUI_TMUX_SESSION_NAME" '#{pane_id}' 2>/dev/null) || return 6
+    [[ "$current_pane" == "$expected_pane" ]] || return 6
+    option_token=$(netui_tmux show-option -qv -t "$NETUI_TMUX_SESSION_NAME" @netui_token 2>/dev/null) || option_token=''
+    option_core=$(netui_tmux show-option -qv -t "$NETUI_TMUX_SESSION_NAME" @netui_core 2>/dev/null) || option_core=''
+    [[ -z "$option_token" || "$option_token" == "$expected_token" ]] || return 6
+    [[ -z "$option_core" || "$option_core" == "$expected_core" ]] || return 6
     netui_tmux kill-session -t "$NETUI_TMUX_SESSION_NAME" >/dev/null 2>&1
 }
 
@@ -367,7 +390,7 @@ _runtime_start_unlocked() {
         ! netui_tmux set-option -t "$NETUI_TMUX_SESSION_NAME" @netui_core "$runtime_core_path" ||
         ! netui_tmux set-option -t "$NETUI_TMUX_SESSION_NAME" @netui_pane "$runtime_pane_id"; then
         rm -f -- "$launcher"
-        if ! runtime_kill_marked_session; then
+        if ! runtime_kill_created_session "$created_pane" "$runtime_token" "$runtime_core_path"; then
             netui_print_error 'cannot mark or safely clean the tmux session as NetUI-owned'
             return 6
         fi
@@ -377,7 +400,7 @@ _runtime_start_unlocked() {
 
     if ! runtime_wait_for_process "$core_path"; then
         rm -f -- "$launcher"
-        if ! runtime_kill_marked_session; then
+        if ! runtime_kill_created_session "$created_pane" "$runtime_token" "$runtime_core_path"; then
             netui_print_error 'sing-box failed and the tmux ownership marker no longer matched; session left untouched'
             return 6
         fi
@@ -390,7 +413,7 @@ _runtime_start_unlocked() {
 
     if ! runtime_state_write || ! runtime_write_endpoint; then
         rm -f -- "$launcher"
-        if ! runtime_kill_marked_session; then
+        if ! runtime_kill_created_session "$created_pane" "$runtime_token" "$runtime_core_path"; then
             netui_print_error 'runtime persistence failed and the tmux ownership marker no longer matched; session left untouched'
             return 6
         fi

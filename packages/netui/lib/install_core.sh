@@ -49,7 +49,7 @@ install_core_require_base_dependencies() {
         install_core_error 'Bash 4 or newer is required'
         return 3
     fi
-    for command_name in jq tmux flock sha256sum realpath tar gzip install; do
+    for command_name in jq tmux flock sha256sum realpath tar gzip install mktemp; do
         install_core_require_command "$command_name" || return $?
     done
 }
@@ -290,6 +290,8 @@ install_core_validate_source_tree() {
         lib/common.sh
         lib/paths.sh
         lib/config_store.sh
+        lib/config_meta.sh
+        lib/share_uri.sh
         lib/env_profiles.sh
         lib/runtime_tmux.sh
         lib/shell_integration.sh
@@ -343,6 +345,8 @@ install_core_validate_release_tree() {
         lib/common.sh
         lib/paths.sh
         lib/config_store.sh
+        lib/config_meta.sh
+        lib/share_uri.sh
         lib/env_profiles.sh
         lib/runtime_tmux.sh
         lib/shell_integration.sh
@@ -569,6 +573,8 @@ install_core_install_release_locked() {
         lib/common.sh
         lib/paths.sh
         lib/config_store.sh
+        lib/config_meta.sh
+        lib/share_uri.sh
         lib/env_profiles.sh
         lib/runtime_tmux.sh
         lib/shell_integration.sh
@@ -729,7 +735,8 @@ install_core_build_release_tree() {
     install -D -m 644 -- "$package_root/../../LICENSE" "$release_root/licenses/NETUI-LICENSE"
     install -D -m 644 -- "$package_root/examples/config.example.json" "$release_root/examples/config.example.json"
     for path in "$package_root/bin/netctl" "$package_root/lib/common.sh" "$package_root/lib/paths.sh" \
-        "$package_root/lib/config_store.sh" "$package_root/lib/env_profiles.sh" "$package_root/lib/runtime_tmux.sh" \
+        "$package_root/lib/config_store.sh" "$package_root/lib/config_meta.sh" "$package_root/lib/share_uri.sh" \
+        "$package_root/lib/env_profiles.sh" "$package_root/lib/runtime_tmux.sh" \
         "$package_root/lib/shell_integration.sh" "$package_root/lib/tui.sh" "$package_root/share/shell/init.sh"; do
         file=${path#"$package_root/"}
         if [[ "$file" == bin/* || "$file" == share/shell/* ]]; then

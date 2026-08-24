@@ -75,6 +75,10 @@ source "$repo_root/packages/netui/lib/common.sh"
 source "$repo_root/packages/netui/lib/paths.sh"
 # shellcheck source=../../packages/netui/lib/config_store.sh
 source "$repo_root/packages/netui/lib/config_store.sh"
+# shellcheck source=../../packages/netui/lib/config_meta.sh
+source "$repo_root/packages/netui/lib/config_meta.sh"
+# shellcheck source=../../packages/netui/lib/share_uri.sh
+source "$repo_root/packages/netui/lib/share_uri.sh"
 # shellcheck source=../../packages/netui/lib/env_profiles.sh
 source "$repo_root/packages/netui/lib/env_profiles.sh"
 # shellcheck source=../../packages/netui/lib/runtime_tmux.sh
@@ -428,6 +432,9 @@ chmod 600 -- "$secret_config"
 tui_detail_output="$test_home/tui-detail.txt"
 assert_status 0 'TUI detail action succeeds on redacted fixture' bash -c 'NETUI_TUI_ACTIONS="detail:secret.json;quit" "$1" > "$2" 2>&1' -- "$test_bin/netui" "$tui_detail_output"
 assert_true 'TUI detail hides secret values' bash -c '! grep -Eq "supersecret|private-secret|00000000-0000" "$1"' -- "$tui_detail_output"
+
+assert_status 0 'config metadata and redaction tests' bash "$script_dir/config_meta.sh"
+assert_status 0 'share URI parser and atomic import tests' bash "$script_dir/uri_import.sh"
 
 if ((failures > 0)); then
     printf '\n%s of %s checks failed\n' "$failures" "$checks" >&2

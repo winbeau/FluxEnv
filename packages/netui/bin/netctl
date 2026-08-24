@@ -13,6 +13,10 @@ source "$netctl_root/lib/common.sh"
 source "$netctl_root/lib/paths.sh"
 # shellcheck source=../lib/config_store.sh
 source "$netctl_root/lib/config_store.sh"
+# shellcheck source=../lib/config_meta.sh
+source "$netctl_root/lib/config_meta.sh"
+# shellcheck source=../lib/share_uri.sh
+source "$netctl_root/lib/share_uri.sh"
 # shellcheck source=../lib/env_profiles.sh
 source "$netctl_root/lib/env_profiles.sh"
 # shellcheck source=../lib/runtime_tmux.sh
