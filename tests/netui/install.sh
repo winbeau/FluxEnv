@@ -12,7 +12,8 @@ cleanup() {
 trap cleanup EXIT HUP INT TERM
 
 tmux_socket="netui-install-${BASHPID}-${RANDOM}"
-release="$fixture/netui-v0.1.0-linux-amd64"
+version=$(<"$repo_root/packages/netui/VERSION")
+release="$fixture/netui-v${version}-linux-amd64"
 mkdir -p "$release/bin" "$release/lib" "$release/share/shell" "$release/examples" "$release/licenses"
 
 for source_file in \
@@ -58,8 +59,8 @@ EOF
 chmod 755 "$release/bin/sing-box" "$release/bin/gum" "$release/install.sh" \
     "$release/bin/netctl" "$release/lib"/*.sh "$release/share/shell/init.sh"
 
-cat > "$release/manifest.json" <<'EOF'
-{"schema":1,"project":"netui","version":"0.1.0","os":"linux","arch":"amd64","assets":[{"name":"sing-box","version":"1.13.18","sha256":"0000000000000000000000000000000000000000000000000000000000000000"},{"name":"gum","version":"2.0.0","sha256":"1111111111111111111111111111111111111111111111111111111111111111"}]}
+cat > "$release/manifest.json" <<EOF
+{"schema":1,"project":"netui","version":"$version","os":"linux","arch":"amd64","assets":[{"name":"sing-box","version":"1.13.18","sha256":"0000000000000000000000000000000000000000000000000000000000000000"},{"name":"gum","version":"2.0.0","sha256":"1111111111111111111111111111111111111111111111111111111111111111"}]}
 EOF
 
 home="$fixture/home"
@@ -69,7 +70,7 @@ HOME="$home" XDG_CONFIG_HOME="$home/.config" XDG_DATA_HOME="$home/.local/share" 
 
 current="$home/.local/share/netui/current"
 [[ -L "$current" ]]
-[[ "$(readlink -- "$current")" == releases/0.1.0 ]]
+[[ "$(readlink -- "$current")" == "releases/$version" ]]
 for command_name in netup netdown netui; do
     [[ -L "$home/.local/bin/$command_name" ]]
     [[ "$(readlink -- "$home/.local/bin/$command_name")" == "$current/bin/netctl" ]]
