@@ -1,9 +1,10 @@
 # NetUI sing-box 配置管理包实施总计划
 
-> 状态：**仅完成调研与计划，尚未实现**
+> 状态：**v0.1.0 基线已实现并发布；本文保留为历史实施计划**
 > 计划日期：2026-08-24
 > 目标仓库：`FluxEnv`
 > GitCode 开发远程：`gc -> git@gitcode.com:winbeau/FluxEnv.git`
+> 后续计划：[`../netui-v2-tui/README.md`](../netui-v2-tui/README.md)（v2rayN 风格全屏 TUI、URI 导入、延迟/速度测试）
 
 ## 1. 已锁定的产品契约
 
