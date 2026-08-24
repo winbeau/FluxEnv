@@ -1,0 +1,171 @@
+#!/bin/bash
+
+set -u
+
+netctl_path=$(realpath -e -- "$0" 2>/dev/null) || exit 1
+netctl_bin_dir=${netctl_path%/*}
+netctl_root=$(cd -P -- "$netctl_bin_dir/.." && pwd -P) || exit 1
+NETUI_PACKAGE_ROOT=$netctl_root
+
+# shellcheck source=../lib/common.sh
+source "$netctl_root/lib/common.sh"
+# shellcheck source=../lib/paths.sh
+source "$netctl_root/lib/paths.sh"
+# shellcheck source=../lib/config_store.sh
+source "$netctl_root/lib/config_store.sh"
+# shellcheck source=../lib/env_profiles.sh
+source "$netctl_root/lib/env_profiles.sh"
+# shellcheck source=../lib/runtime_tmux.sh
+source "$netctl_root/lib/runtime_tmux.sh"
+# shellcheck source=../lib/shell_integration.sh
+source "$netctl_root/lib/shell_integration.sh"
+# shellcheck source=../lib/tui.sh
+source "$netctl_root/lib/tui.sh"
+
+netctl_version() {
+    local version=''
+
+    version=$(<"$netctl_root/VERSION") || version='unknown'
+    printf '%s\n' "$version"
+}
+
+netctl_usage() {
+    cat <<'EOF'
+Usage:
+  netup [--help|--version]
+  netdown [--help|--version]
+  netui [--help|--version]
+
+netup starts only the JSON selected by ~/.config/netui/default.json.
+netdown stops only a verified NetUI-owned tmux instance.
+netui is reserved for the interactive configuration UI.
+EOF
+}
+
+netctl_command_help() {
+    case "$1" in
+        netup)
+            printf 'Usage: netup [--help|--version]\n'
+            ;;
+        netdown)
+            printf 'Usage: netdown [--help|--version]\n'
+            ;;
+        netui)
+            printf 'Usage: netui [--help|--version]\n'
+            ;;
+        *)
+            netctl_usage
+            ;;
+    esac
+}
+
+run_netup() {
+    if (($# > 0)); then
+        case "$1" in
+            --help)
+                netctl_command_help netup
+                return 0
+                ;;
+            --version)
+                netctl_version
+                return 0
+                ;;
+            *)
+                netui_print_error 'netup does not accept a positional configuration; set default.json first'
+                netctl_command_help netup >&2
+                return 2
+                ;;
+        esac
+    fi
+
+    runtime_start
+}
+
+run_netdown() {
+    if (($# > 0)); then
+        case "$1" in
+            --help)
+                netctl_command_help netdown
+                return 0
+                ;;
+            --version)
+                netctl_version
+                return 0
+                ;;
+            *)
+                netui_print_error 'netdown does not accept positional arguments'
+                netctl_command_help netdown >&2
+                return 2
+                ;;
+        esac
+    fi
+
+    runtime_stop
+}
+
+run_netui() {
+    if (($# > 0)); then
+        case "$1" in
+            --help)
+                netctl_command_help netui
+                return 0
+                ;;
+            --version)
+                netctl_version
+                return 0
+                ;;
+        esac
+        netui_print_error 'netui does not accept arguments in this stage'
+        return 2
+    fi
+
+    tui_run
+}
+
+entrypoint=${0##*/}
+if [[ "$entrypoint" == netctl ]]; then
+    if (($# > 0)); then
+        case "$1" in
+            netup|netdown|netui)
+                entrypoint=$1
+                shift
+                ;;
+            --help)
+                netctl_usage
+                exit 0
+                ;;
+            --version)
+                netctl_version
+                exit 0
+                ;;
+            *)
+                netui_print_error "unknown internal command: $1"
+                netctl_usage >&2
+                exit 2
+                ;;
+        esac
+    else
+        netctl_usage >&2
+        exit 2
+    fi
+fi
+
+case "$entrypoint" in
+    netup)
+        run_netup "$@"
+        exit $?
+        ;;
+    netdown)
+        run_netdown "$@"
+        exit $?
+        ;;
+    netui)
+        run_netui "$@"
+        exit $?
+        ;;
+    *)
+        netui_print_error "unsupported argv[0]: $entrypoint"
+        netctl_usage >&2
+        exit 2
+        ;;
+esac
