@@ -3,6 +3,6 @@ Set Width 1120
 Set Height 560
 Set FontSize 14
 Set TypingSpeed 0ms
-Type "bash tests/netui/visual/scene.sh fallback"
+Type "tput civis 2>/dev/null || true; bash tests/netui/visual/scene.sh fallback"
 Enter
 Sleep 8s
